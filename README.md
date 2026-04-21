@@ -8,7 +8,7 @@
 
 Digital payment platforms process thousands of transactions per minute. These systems are often vulnerable to fraudulent activities not because of code defects, but because of **business logic weaknesses** — attackers exploit how the system is designed to behave, not bugs in the implementation.
 
-Fraudulent patterns include: abnormally large transactions, high-frequency operations from a single user in a short window, operations from high-risk jurisdictions, and off-hours activity consistent with automated fraud. Without an automated detection layer, these go unnoticed until financial damage has occurred.
+Fraudulent patterns include: abnormally large transactions, high-frequency operations from a single user in a short window, structuring (amounts just below detection thresholds like $9,999), and external transfers/withdrawals to unknown accounts. Without an automated detection layer, these go unnoticed until financial damage has occurred.
 
 ## Objectives
 
@@ -18,35 +18,41 @@ Fraudulent patterns include: abnormally large transactions, high-frequency opera
 - Simulate payment transactions through a REST API
 - Calculate a risk score for each transaction based on predefined fraud indicators
 - Automatically block transactions that exceed a defined risk threshold
-- Log suspicious events in an auditable format
+- Flag suspicious transactions for manual review
+- Log all events in an auditable format
 - Apply security practices (SAST, SCA, input validation) within the CI/CD pipeline
 
 ## Methodology
 
 The project follows an iterative development approach combining secure software development practices with controlled testing through simulated transactions.
 
-**Layer 1 — Functional System:** A FastAPI REST API processes and registers simulated payment transactions. A core risk scoring engine evaluates each transaction against 6 fraud detection rules and automatically approves or blocks the operation. All transactions are persisted with their risk score, status, and triggered flags for auditability.
+**Layer 1 — Functional System:** A FastAPI REST API processes and registers simulated payment transactions. A core risk scoring engine evaluates each transaction against 4 fraud detection rules and automatically approves, flags, or blocks the operation. All transactions are persisted with their risk score, risk level, status, and triggered reasons for auditability.
 
-**Layer 2 — Security in the SSDLC:** Threat modeling using STRIDE is applied to identify critical assets and potential threats. Input validation guards against SQL injection and XSS. All blocked transactions are stored with audit flags. A risk matrix documents which vulnerabilities were mitigated, which controls were implemented, and which residual risks were accepted.
+**Layer 2 — Security in the SSDLC:** Threat modeling using STRIDE is applied to identify critical assets and potential threats. Input validation is enforced on all fields. All transactions are stored with full audit flags. A risk matrix documents which vulnerabilities were mitigated, which controls were implemented, and which residual risks were accepted.
 
 **Layer 3 — DevSecOps Automation:** A GitHub Actions CI/CD pipeline runs automatically on every push and pull request, executing: static application security testing (Bandit), dependency vulnerability scanning (pip-audit), and automated test execution (pytest). A quality gate blocks merges if any critical issue is detected.
 
 ---
-`
+
 
 ## Fraud Detection Rules
 
 | Rule | Points | Trigger |
 |------|--------|---------|
-| Very large amount | 50 | Amount > $10,000 |
-| Large amount | 30 | Amount > $5,000 |
-| High frequency | 25 | >5 transactions from same user in last 10 min |
-| Rapid succession | 15 | >2 transactions from same user in last 60 sec |
-| High-risk country | 20 | ISO code in watchlist (NG, RU, KP, IR, VE) |
-| Unusual hour | 10 | 01:00–04:00 UTC |
-| Round number | 5 | Exact multiples of $100 (structuring indicator) |
+| Very large amount | +40 | Amount > $10,000 |
+| Large amount | +20 | Amount > $5,000 |
+| Structuring | +15 | Suspicious amounts ($999, $4,999, $9,999…) |
+| High frequency | +30 | ≥ 5 transactions from same user in last hour |
+| Elevated frequency | +15 | ≥ 3 transactions from same user in last hour |
+| External transfer/withdrawal | +10 | Transfer or withdrawal to a different account |
 
-**Block threshold:** Score ≥ 70 → `blocked`
+**Decision thresholds:**
+
+| Score | Risk Level | Status |
+|-------|------------|--------|
+| 0 – 25 | LOW | ✅ Approved |
+| 26 – 75 | MEDIUM / HIGH | ⚠️ Flagged (approved, under review) |
+| 76 – 100 | CRITICAL | 🚫 Blocked |
 
 ---
 
@@ -64,9 +70,10 @@ uvicorn app.main:app --reload
 |--------|----------|-------------|
 | POST | `/transactions/` | Submit transaction for fraud analysis |
 | GET | `/transactions/` | List all transactions |
-| GET | `/transactions/metrics` | Dashboard metrics |
 | GET | `/transactions/{id}` | Get single transaction |
+| GET | `/transactions/user/{user_id}` | Transaction history for a user |
 | GET | `/health` | Health check |
+
 
 ---
 
@@ -90,3 +97,4 @@ pytest tests/ -v
 ---
 
 ## Security Controls Implemented
+
