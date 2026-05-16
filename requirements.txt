@@ -26,3 +26,7 @@ pytest
 sentence-transformers
 
 streamlit
+
+scikit-learn
+joblib
+torch

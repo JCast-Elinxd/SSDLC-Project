@@ -14,6 +14,10 @@ Umbrales de decisión:
   26–50  → MEDIUM   → FLAGGED
   51–75  → HIGH     → FLAGGED
   76–100 → CRITICAL → BLOCKED
+
+Score híbrido:
+  El score final combina el motor de reglas (50%) con la predicción
+  de la red neuronal (50%) mediante ml_service.hybrid_score().
 """
 
 import json
@@ -25,6 +29,7 @@ from sqlalchemy.orm import Session
 from app.transaction_models import (
     Transaction, TransactionType, RiskLevel, TransactionStatus
 )
+from app.ml_service import get_ml_prediction, hybrid_score   # ← ML
 
 
 # ── Constantes ────────────────────────────────────────────────────────────────
@@ -51,7 +56,7 @@ def calculate_risk_score(
     db: Session,
 ) -> tuple[float, list[str]]:
     """
-    Calcula el score de riesgo (0–100).
+    Calcula el score de riesgo basado en reglas (0–100).
     Retorna (score, lista_de_razones).
     """
     score = 0.0
@@ -126,11 +131,20 @@ def create_transaction(
     ip_address: str | None = None,
     db: Session = None,
 ) -> Transaction:
-    """Crea una transacción, calcula su riesgo y la persiste en BD."""
+    """Crea una transacción, calcula su riesgo (reglas + red neuronal) y la persiste en BD."""
     if amount <= 0:
         raise HTTPException(status_code=400, detail="El monto debe ser mayor a 0.")
 
-    score, reasons = calculate_risk_score(
+    # ── 1. Contar transacciones recientes (se usa en reglas y en ML) ──────────
+    cutoff = datetime.now(timezone.utc) - RECENT_WINDOW
+    recent_count = (
+        db.query(Transaction)
+        .filter(Transaction.user_id == user_id, Transaction.created_at >= cutoff)
+        .count()
+    )
+
+    # ── 2. Score basado en reglas ─────────────────────────────────────────────
+    rules_score, reasons = calculate_risk_score(
         user_id=user_id,
         amount=amount,
         transaction_type=transaction_type,
@@ -138,17 +152,41 @@ def create_transaction(
         db=db,
     )
 
+    # ── 3. Predicción de la red neuronal ──────────────────────────────────────
+    ml_pred = get_ml_prediction(
+        amount=amount,
+        transaction_type=transaction_type,
+        user_id=user_id,
+        destination_id=destination_id,
+        recent_tx_count=recent_count,
+    )
+
+    # ── 4. Score híbrido: 70% ML + 30% reglas ────────────────────────────────
+    final_score = hybrid_score(rules_score, ml_pred.ml_risk_score, ml_weight=0.5)
+
+    # Añadir razón ML si el modelo detecta riesgo elevado y está disponible
+    if ml_pred.model_available and ml_pred.prob_blocked >= 0.40:
+        reasons.append(
+            f"[Red Neuronal] Alta probabilidad de fraude: {ml_pred.prob_blocked:.0%} "
+            f"(aprobado={ml_pred.prob_approved:.0%}, marcado={ml_pred.prob_flagged:.0%})"
+        )
+    elif ml_pred.model_available and ml_pred.prob_flagged >= 0.50:
+        reasons.append(
+            f"[Red Neuronal] Perfil de riesgo elevado detectado "
+            f"(p_marcado={ml_pred.prob_flagged:.0%})"
+        )
+
     tx = Transaction(
         user_id=user_id,
         amount=amount,
         currency=currency,
         transaction_type=transaction_type,
         destination_id=destination_id,
-        risk_score=score,
-        risk_level=_score_to_level(score),
+        risk_score=final_score,
+        risk_level=_score_to_level(final_score),
         risk_reasons=json.dumps(reasons),
-        status=_score_to_status(score),
-        blocked=(_score_to_status(score) == TransactionStatus.BLOCKED),
+        status=_score_to_status(final_score),
+        blocked=(_score_to_status(final_score) == TransactionStatus.BLOCKED),
         ip_address=ip_address,
     )
     db.add(tx)
