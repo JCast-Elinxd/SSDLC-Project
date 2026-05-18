@@ -4,7 +4,8 @@ services:
 
   fastapi:
     build: .
-    container_name: fastapi_app
+    container_name: SSDLC-fastapi_app
+    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
     ports:
       - "8000:8000"
@@ -13,7 +14,8 @@ services:
       - .:/app
 
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
 
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -24,6 +26,7 @@ services:
 
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_LOG4J_ROOT_LOGLEVEL: ERROR
 
     ports:
       - "2181:2181"
@@ -31,20 +34,52 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
-
     depends_on:
       - zookeeper
 
     ports:
       - "9092:9092"
 
+    healthcheck:
+      test: ["CMD", "bash", "-c", "nc -z localhost 9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
     environment:
       KAFKA_BROKER_ID: 1
-
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
 
+      # 🔇 REDUCCIÓN DE LOGS
+      KAFKA_LOG4J_ROOT_LOGLEVEL: ERROR
+
+      KAFKA_LOG4J_LOGGERS: >
+        kafka=WARN,
+        kafka.controller=WARN,
+        kafka.log.LogCleaner=WARN,
+        state.change.logger=WARN,
+        kafka.producer.async.DefaultEventHandler=ERROR
+
+      KAFKA_TOOLS_LOG4J_ROOT_LOGLEVEL: ERROR
+
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  consumer:
+
+    build: .
+
+    container_name: kafka_consumer
+
+    command: python -m app.streaming.consumer
+
+    depends_on:
+      kafka:
+        condition: service_healthy
+        
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_LOG4J_ROOT_LOGLEVEL: ERROR
+
+    volumes:
+      - .:/app

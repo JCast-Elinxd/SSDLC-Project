@@ -23,7 +23,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from app.transaction_models import TransactionType, TransactionStatus, RiskLevel
+from app.transactions.models import TransactionType, TransactionStatus, RiskLevel
 
 logger = logging.getLogger(__name__)
 
