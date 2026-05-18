@@ -26,7 +26,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.transaction_models import (
+from app.transactions.models import (
     Transaction, TransactionType, RiskLevel, TransactionStatus
 )
 from app.ml_service import get_ml_prediction, hybrid_score   # ← ML

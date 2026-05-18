@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
 
-from app.models import Document
+from app.documents.models import Document
 
 # Variables
 
