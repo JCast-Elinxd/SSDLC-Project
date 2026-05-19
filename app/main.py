@@ -3,19 +3,21 @@ Fraud Detection System — API principal.
 
 Arranca con:
     pip install -r requirements.txt
-    python -m uvicorn app.main:app --reload --reload-exclude "app/chroma_data/*"
+    python -m uvicorn app.main:app --reload --reload-exclude "app/data/*"
     https://vigilant-eureka-qwwg95g7xr5cp44-8000.github.dev/docs
 """
 
 from fastapi import FastAPI
-from app.models import create_tables
-from app.routers import router
-from app.transaction_routers import router as transaction_router
+from app.documents.models import create_tables
+from app.documents.routers import router
+from app.transactions.routers import router as transaction_router
+from app.streaming.routers import router as streaming_router
 
 app = FastAPI(title="Fraud Detection System API")
 
 app.include_router(router)
 app.include_router(transaction_router)
+app.include_router(streaming_router)
 
 @app.get("/")
 def root():

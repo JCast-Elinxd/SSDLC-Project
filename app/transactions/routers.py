@@ -14,11 +14,11 @@ from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.models import get_db
-from app.transaction_models import (
+from app.documents.models import get_db
+from app.transactions.models import (
     TransactionType, TransactionStatus, RiskLevel, create_transaction_tables
 )
-from app.transaction_services import (
+from app.transactions.services import (
     create_transaction, get_transaction, list_transactions
 )
 
@@ -91,7 +91,7 @@ def create_transaction_endpoint(
     body:    TransactionRequest,
     request: Request,
     db:      Session = Depends(get_db),
-):
+): 
     """Evalúa y registra una nueva transacción."""
     ip = request.client.host if request.client else None
 
