@@ -50,6 +50,20 @@ class TransactionRequest(BaseModel):
             )
         return v
 
+    @field_validator("user_id")
+    @classmethod
+    def validate_user_id(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("El user_id no puede estar vacío.")
+        if len(v) > 64:
+            raise ValueError("El user_id no puede superar 64 caracteres.")
+        forbidden = {"<", ">", "'", '"', ";", "--", "/*", "*/"}
+        for char in forbidden:
+            if char in v:
+                raise ValueError(f"El user_id contiene caracteres no permitidos: '{char}'")
+        return v
+
 
 class TransactionResponse(BaseModel):
     id:               str
