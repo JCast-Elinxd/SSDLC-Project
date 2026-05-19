@@ -64,6 +64,20 @@ class TransactionRequest(BaseModel):
                 raise ValueError(f"El user_id contiene caracteres no permitidos: '{char}'")
         return v
 
+    @field_validator("destination_id")
+    @classmethod
+    def validate_destination_id(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip()
+        if len(v) > 64:
+            raise ValueError("El destination_id no puede superar 64 caracteres.")
+        forbidden = {"<", ">", "'", '"', ";", "--", "/*", "*/"}
+        for char in forbidden:
+            if char in v:
+                raise ValueError(f"El destination_id contiene caracteres no permitidos: '{char}'")
+        return v
+
 
 class TransactionResponse(BaseModel):
     id:               str
