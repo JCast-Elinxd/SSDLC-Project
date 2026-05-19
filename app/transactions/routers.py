@@ -13,6 +13,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from pydantic import BaseModel, Field, field_validator
 
 from app.documents.models import get_db
 from app.transactions.models import (
@@ -29,12 +30,25 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
+ALLOWED_CURRENCIES = {"USD", "EUR", "COP", "GBP", "MXN", "BRL"}
+
 class TransactionRequest(BaseModel):
     user_id:          str             = Field(..., example="user_123")
     amount:           float           = Field(..., gt=0, example=1500.00)
     currency:         str             = Field(default="USD", example="USD")
     transaction_type: TransactionType = Field(..., example="transfer")
     destination_id:   Optional[str]   = Field(default=None, example="user_456")
+
+    @field_validator("currency")
+    @classmethod
+    def validate_currency(cls, v: str) -> str:
+        v = v.upper().strip()
+        if v not in ALLOWED_CURRENCIES:
+            raise ValueError(
+                f"Moneda no soportada: '{v}'. "
+                f"Permitidas: {sorted(ALLOWED_CURRENCIES)}"
+            )
+        return v
 
 
 class TransactionResponse(BaseModel):
