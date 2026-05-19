@@ -99,7 +99,13 @@ def calculate_risk_score(
             score += 10
             reasons.append(f"Transfer/retiro hacia cuenta externa: {destination_id}")
 
+    # Regla 5: Monto exactamente redondo muy alto (structuring avanzado)
+    if amount >= 10_000 and amount % 1000 == 0:
+        score += 15
+        reasons.append(f"Monto exactamente redondo y alto: ${amount:,.2f} (posible evasión de controles)")
+
     return round(min(score, 100.0), 2), reasons
+
 
 
 def _score_to_level(score: float) -> RiskLevel:
