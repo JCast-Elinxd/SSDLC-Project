@@ -12,8 +12,8 @@ from fastapi import APIRouter, Depends, UploadFile, File, Query
 from pydantic import BaseModel # Validacion de Datos
 from sqlalchemy.orm import Session # SQL
 
-from app.models import get_db
-from app.services import upload_document, get_document, list_documents
+from app.documents.models import get_db
+from app.documents.services import upload_document, get_document, list_documents
 
 import shutil, os # Automated Data management
 

@@ -13,12 +13,13 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from pydantic import BaseModel, Field, field_validator
 
-from app.models import get_db
-from app.transaction_models import (
+from app.documents.models import get_db
+from app.transactions.models import (
     TransactionType, TransactionStatus, RiskLevel, create_transaction_tables
 )
-from app.transaction_services import (
+from app.transactions.services import (
     create_transaction, get_transaction, list_transactions
 )
 
@@ -29,12 +30,53 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
+ALLOWED_CURRENCIES = {"USD", "EUR", "COP", "GBP", "MXN", "BRL"}
+
 class TransactionRequest(BaseModel):
     user_id:          str             = Field(..., example="user_123")
     amount:           float           = Field(..., gt=0, example=1500.00)
     currency:         str             = Field(default="USD", example="USD")
     transaction_type: TransactionType = Field(..., example="transfer")
     destination_id:   Optional[str]   = Field(default=None, example="user_456")
+
+    @field_validator("currency")
+    @classmethod
+    def validate_currency(cls, v: str) -> str:
+        v = v.upper().strip()
+        if v not in ALLOWED_CURRENCIES:
+            raise ValueError(
+                f"Moneda no soportada: '{v}'. "
+                f"Permitidas: {sorted(ALLOWED_CURRENCIES)}"
+            )
+        return v
+
+    @field_validator("user_id")
+    @classmethod
+    def validate_user_id(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("El user_id no puede estar vacío.")
+        if len(v) > 64:
+            raise ValueError("El user_id no puede superar 64 caracteres.")
+        forbidden = {"<", ">", "'", '"', ";", "--", "/*", "*/"}
+        for char in forbidden:
+            if char in v:
+                raise ValueError(f"El user_id contiene caracteres no permitidos: '{char}'")
+        return v
+
+    @field_validator("destination_id")
+    @classmethod
+    def validate_destination_id(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip()
+        if len(v) > 64:
+            raise ValueError("El destination_id no puede superar 64 caracteres.")
+        forbidden = {"<", ">", "'", '"', ";", "--", "/*", "*/"}
+        for char in forbidden:
+            if char in v:
+                raise ValueError(f"El destination_id contiene caracteres no permitidos: '{char}'")
+        return v
 
 
 class TransactionResponse(BaseModel):
@@ -91,7 +133,7 @@ def create_transaction_endpoint(
     body:    TransactionRequest,
     request: Request,
     db:      Session = Depends(get_db),
-):
+): 
     """Evalúa y registra una nueva transacción."""
     ip = request.client.host if request.client else None
 

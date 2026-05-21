@@ -30,3 +30,5 @@ streamlit
 scikit-learn
 joblib
 torch
+
+kafka-python

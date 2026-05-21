@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
 from sqlalchemy import Column, String, DateTime, Float, Integer, Enum, Boolean, Text
-from app.models import Base, engine  # reutiliza la misma Base y engine
+from app.documents.models import Base, engine  # reutiliza la misma Base y engine
 
 
 # ── Enums ────────────────────────────────────────────────────────────────────
