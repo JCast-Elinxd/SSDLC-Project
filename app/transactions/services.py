@@ -173,13 +173,20 @@ def create_transaction(
     # Añadir razón ML si el modelo detecta riesgo elevado y está disponible
     if ml_pred.model_available and ml_pred.prob_blocked >= 0.40:
         reasons.append(
-            f"[Red Neuronal] Alta probabilidad de fraude: {ml_pred.prob_blocked:.0%} "
+            f"[Red Neuronal] score={ml_pred.ml_risk_score:.1f} Alta probabilidad de fraude: {ml_pred.prob_blocked:.0%} "
             f"(aprobado={ml_pred.prob_approved:.0%}, marcado={ml_pred.prob_flagged:.0%})"
         )
     elif ml_pred.model_available and ml_pred.prob_flagged >= 0.50:
         reasons.append(
-            f"[Red Neuronal] Perfil de riesgo elevado detectado "
+            f"[Red Neuronal] score={ml_pred.ml_risk_score:.1f} Perfil de riesgo elevado detectado "
             f"(p_marcado={ml_pred.prob_flagged:.0%})"
+        )
+    else:
+        reasons.append(
+            f"[Red Neuronal] score={ml_pred.ml_risk_score:.1f} "
+            f"(aprobado={ml_pred.prob_approved:.0%}, "
+            f"marcado={ml_pred.prob_flagged:.0%}, "
+            f"bloqueado={ml_pred.prob_blocked:.0%})"
         )
 
     tx = Transaction(
